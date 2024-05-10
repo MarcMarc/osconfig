@@ -16,6 +16,7 @@ package recipes
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -85,9 +86,12 @@ func convertVersion(version string) ([]int, error) {
 		if idx > 3 {
 			return nil, fmt.Errorf("invalid Version string")
 		}
-		val, err := strconv.ParseUint(element, 10, 0)
+		val, err := strconv.ParseUint(element, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Version string")
+		}
+		if val > math.MaxInt { // Check against the maximum int value
+			return nil, fmt.Errorf("invalid version string: value too large (%d)", val)
 		}
 		ret = append(ret, int(val))
 	}

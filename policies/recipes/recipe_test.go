@@ -52,6 +52,14 @@ func TestRecipe_SetVersion_InvalidCharacter(t *testing.T) {
 	}
 }
 
+func TestRecipe_SetVersion_InvalidIntTooLarge(t *testing.T) {
+	rec := &Recipe{}
+	err := rec.setVersion("12.32.9223372036854775808.23")
+	if !strings.Contains(err.Error(), "invalid") {
+		t.Errorf("setVersion should return error")
+	}
+}
+
 func TestRecipe_Compare_EmptyVersion(t *testing.T) {
 	rec := &Recipe{Version: []int{1, 2, 3, 4}}
 	if rec.compare("") {
