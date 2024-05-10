@@ -100,6 +100,18 @@ func parsePermissions(s string) (os.FileMode, error) {
 	return os.FileMode(i), nil
 }
 
+func isRel(candidate, target string) bool {
+	if filepath.IsAbs(candidate) {
+		return false
+	}
+	realpath, err := filepath.EvalSymlinks(filepath.Join(target, candidate))
+	if err != nil {
+		return false
+	}
+	relpath, err := filepath.Rel(target, realpath)
+	return err == nil && !strings.HasPrefix(filepath.Clean(relpath), "..")
+}
+
 func stepExtractArchive(ctx context.Context, step *agentendpointpb.SoftwareRecipe_Step_ExtractArchive, artifacts map[string]string, runEnvs []string, stepDir string) error {
 	artifact := step.GetArtifactId()
 	filename, ok := artifacts[artifact]
@@ -136,6 +148,9 @@ func extractZip(zipPath string, dst string) error {
 
 	// Check for conflicts
 	for _, f := range zr.File {
+		if !strings.Contains(f.Name, "..") {
+			return fmt.Errorf("file name contains malicious '..' part: %s", f.Name)
+		}
 		filen, err := util.NormPath(filepath.Join(dst, f.Name))
 		if err != nil {
 			return err
@@ -230,6 +245,9 @@ func decompress(reader io.Reader, archiveType agentendpointpb.SoftwareRecipe_Ste
 func checkForConflicts(tr *tar.Reader, dst string) error {
 	for {
 		header, err := tr.Next()
+		if !strings.Contains(header.Name, "..") {
+			return fmt.Errorf("file name contains malicious '..' part: %s", header.Name)
+		}
 		if err == io.EOF {
 			break
 		}
@@ -329,6 +347,9 @@ func extractTar(ctx context.Context, tarName string, dst string, archiveType age
 			}
 			continue
 		case tar.TypeSymlink:
+			if !isRel(header.Name, filen) || !isRel(header.Linkname, filen) {
+				return fmt.Errorf("malicious symlink detected: %s %s", header.Name, header.Linkname)
+			}
 			if err := os.Symlink(header.Linkname, filen); err != nil {
 				return err
 			}
